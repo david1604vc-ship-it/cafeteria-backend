@@ -13,7 +13,7 @@ const pool = mysql.createPool({
   ...(process.env.DB_SSL === 'true' && {
     ssl: process.env.DB_CA_CERT
       ? { ca: process.env.DB_CA_CERT, minVersion: 'TLSv1.2' }
-      : { minVersion: 'TLSv1.2' }
+      : { minVersion: 'TLSv1.2', rejectUnauthorized: false }
   })
 })
 
