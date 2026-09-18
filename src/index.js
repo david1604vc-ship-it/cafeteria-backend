@@ -7,14 +7,23 @@ require('dotenv').config()
 
 const app = express()
 
+// Necesario detrás del proxy de Render/Railway para que req.ip sea real
+app.set('trust proxy', 1)
+
 // ── Seguridad
 app.use(helmet())
 app.use(cors({
   origin: function(origin, callback) {
-    // Permitir localhost y devtunnels
+    // Orígenes extra configurables: CORS_ORIGIN=https://app.vercel.app,https://otro.com
+    const extraOrigins = (process.env.CORS_ORIGIN || '')
+      .split(',')
+      .map(o => o.trim())
+      .filter(Boolean)
+    // Permitir localhost, devtunnels y orígenes configurados
     if (!origin || 
         origin.includes('localhost') || 
-        origin.includes('devtunnels.ms')) {
+        origin.includes('devtunnels.ms') ||
+        extraOrigins.includes(origin)) {
       callback(null, true)
     } else {
       callback(new Error('No permitido por CORS'))
