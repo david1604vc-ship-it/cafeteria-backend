@@ -237,11 +237,24 @@ const enviarCodigo = conManejadorDeErrores(async (req, res) => {
 
   // [6] Callback: twilioClient.messages.create recibe un objeto de configuración
   //     y resuelve la promesa cuando termina (callback asíncrono con await)
-  await twilioClient.messages.create({
-    body: `Tu código de verificación de Cafetería 2 ITLC es: ${codigo}. Válido por 5 minutos.`,
-    from: process.env.TWILIO_PHONE,
-    to:   `+52${telefono}`
-  })
+  try {
+    await twilioClient.messages.create({
+      body: `Tu código de verificación de Cafetería 2 ITLC es: ${codigo}. Válido por 5 minutos.`,
+      from: process.env.TWILIO_PHONE,
+      to:   `+52${telefono}`
+    })
+  } catch (errTwilio) {
+    console.error('Twilio no pudo enviar el SMS:', errTwilio.code, '-', errTwilio.message)
+    // 21608 = número no verificado (cuenta trial de Twilio)
+    if (errTwilio.code === 21608) {
+      return res.status(502).json({
+        mensaje: 'Tu número no puede recibir SMS todavía: en la cuenta de prueba de Twilio solo se envía a números verificados. Verifica tu número en console.twilio.com e inténtalo de nuevo.'
+      })
+    }
+    return res.status(502).json({
+      mensaje: 'No se pudo enviar el SMS en este momento, inténtalo de nuevo más tarde'
+    })
+  }
 
   console.log(`SMS enviado a +52${telefono} — Código: ${codigo}`)
   res.json({ mensaje: 'Si el número existe, recibirás un código' })
