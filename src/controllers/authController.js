@@ -281,6 +281,12 @@ const enviarCodigo = conManejadorDeErrores(async (req, res) => {
         mensaje: 'El canal de WhatsApp no está activado todavía en la cuenta de Twilio. Actívalo en console.twilio.com (Messaging → Try it out → WhatsApp) e inténtalo de nuevo.'
       })
     }
+    // 63038 = límite diario de mensajes del sandbox agotado (cuentas trial: 5/día)
+    if (errTwilio.code === 63038) {
+      return res.status(502).json({
+        mensaje: 'Se alcanzó el límite diario de mensajes de prueba de Twilio (5 al día). Inténtalo mañana, o actualiza la cuenta de Twilio para eliminar el límite.'
+      })
+    }
     return res.status(502).json({
       mensaje: 'No se pudo enviar el WhatsApp en este momento, inténtalo de nuevo más tarde'
     })
