@@ -204,7 +204,35 @@ const _loginLogica = async (req, res) => {
 
 const login = conManejadorDeErrores(conValidacion(_loginLogica))
 
-// ── ENVIAR CÓDIGO SMS
+// ── ENVÍO DEL CÓDIGO POR WHATSAPP (sandbox de Twilio)
+//    Requiere que el usuario haya vinculado su WhatsApp mandando
+//    "join <código-sandbox>" al número +1 415 523 8886 (una vez cada 72h).
+const WHATSAPP_FROM = process.env.TWILIO_WHATSAPP_FROM || 'whatsapp:+14155238886'
+const WHATSAPP_TEMPLATE_SID = process.env.TWILIO_WHATSAPP_TEMPLATE_SID || 'HX2294f92c7a197a9fd5889d4835900a7c'
+
+const enviarCodigoPorWhatsApp = async (telefono, codigo) => {
+  // 1er intento: plantilla pre-aprobada "Verification Codes" (válida fuera de la ventana de 24h)
+  try {
+    await twilioClient.messages.create({
+      from: WHATSAPP_FROM,
+      to: `whatsapp:+52${telefono}`,
+      contentSid: WHATSAPP_TEMPLATE_SID,
+      contentVariables: JSON.stringify({ 1: codigo })
+    })
+    return
+  } catch (err) {
+    // 21655 = la plantilla no está disponible en esta cuenta → probar mensaje libre
+    if (err.code !== 21655) throw err
+  }
+  // 2do intento: mensaje libre (funciona dentro de las 24h posteriores al "join")
+  await twilioClient.messages.create({
+    from: WHATSAPP_FROM,
+    to: `whatsapp:+52${telefono}`,
+    body: `Tu código de verificación de Cafetería 2 ITLC es: ${codigo}. Válido por 5 minutos.`
+  })
+}
+
+// ── ENVIAR CÓDIGO
 const enviarCodigo = conManejadorDeErrores(async (req, res) => {
   // [2] Desestructuración
   const { telefono } = req.body
@@ -235,29 +263,30 @@ const enviarCodigo = conManejadorDeErrores(async (req, res) => {
     [rows[0].id_usuario, codigo, expira]
   )
 
-  // [6] Callback: twilioClient.messages.create recibe un objeto de configuración
-  //     y resuelve la promesa cuando termina (callback asíncrono con await)
   try {
-    await twilioClient.messages.create({
-      body: `Tu código de verificación de Cafetería 2 ITLC es: ${codigo}. Válido por 5 minutos.`,
-      from: process.env.TWILIO_PHONE,
-      to:   `+52${telefono}`
-    })
+    await enviarCodigoPorWhatsApp(telefono, codigo)
   } catch (errTwilio) {
-    console.error('Twilio no pudo enviar el SMS:', errTwilio.code, '-', errTwilio.message)
-    // 21608 = número no verificado (cuenta trial de Twilio)
-    if (errTwilio.code === 21608) {
+    console.error('Twilio no pudo enviar el WhatsApp:', errTwilio.code, '-', errTwilio.message)
+    const ayudaVinculacion = process.env.TWILIO_SANDBOX_CODE
+      ? `Desde tu WhatsApp manda el mensaje "join ${process.env.TWILIO_SANDBOX_CODE}" al número +1 415 523 8886 e inténtalo de nuevo.`
+      : 'Vincula tu WhatsApp al sandbox de Twilio (en console.twilio.com: Messaging → Try it out → WhatsApp) e inténtalo de nuevo.'
+    // 63015 = WhatsApp no vinculado al sandbox · 63016 = ventana de 24h expirada
+    if (errTwilio.code === 63015 || errTwilio.code === 63016) {
+      return res.status(502).json({ mensaje: `No pudimos enviarte el WhatsApp. ${ayudaVinculacion}` })
+    }
+    // 63007 = el canal de WhatsApp no está activado en la cuenta de Twilio
+    if (errTwilio.code === 63007) {
       return res.status(502).json({
-        mensaje: 'Tu número no puede recibir SMS todavía: en la cuenta de prueba de Twilio solo se envía a números verificados. Verifica tu número en console.twilio.com e inténtalo de nuevo.'
+        mensaje: 'El canal de WhatsApp no está activado todavía en la cuenta de Twilio. Actívalo en console.twilio.com (Messaging → Try it out → WhatsApp) e inténtalo de nuevo.'
       })
     }
     return res.status(502).json({
-      mensaje: 'No se pudo enviar el SMS en este momento, inténtalo de nuevo más tarde'
+      mensaje: 'No se pudo enviar el WhatsApp en este momento, inténtalo de nuevo más tarde'
     })
   }
 
-  console.log(`SMS enviado a +52${telefono} — Código: ${codigo}`)
-  res.json({ mensaje: 'Si el número existe, recibirás un código' })
+  console.log(`WhatsApp enviado a +52${telefono} — Código: ${codigo}`)
+  res.json({ mensaje: 'Si el número existe, recibirás un código por WhatsApp' })
 })
 
 // ── VERIFICAR CÓDIGO
