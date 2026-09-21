@@ -19,10 +19,13 @@ app.use(cors({
       .split(',')
       .map(o => o.trim())
       .filter(Boolean)
+    // Permitir cualquier subdominio de vercel.app (producción y previews)
+    const esDominioVercel = /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin || '')
     // Permitir localhost, devtunnels y orígenes configurados
     if (!origin || 
         origin.includes('localhost') || 
         origin.includes('devtunnels.ms') ||
+        esDominioVercel ||
         extraOrigins.includes(origin)) {
       callback(null, true)
     } else {
