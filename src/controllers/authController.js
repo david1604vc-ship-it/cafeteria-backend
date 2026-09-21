@@ -221,8 +221,9 @@ const enviarCodigoPorWhatsApp = async (telefono, codigo) => {
     })
     return
   } catch (err) {
-    // 21655 = la plantilla no está disponible en esta cuenta → probar mensaje libre
-    if (err.code !== 21655) throw err
+    // Errores del canal (no vinculado / sin ventana / canal inactivo) se reportan tal cual;
+    // cualquier otro (p. ej. 21655 = plantilla no disponible) → probar mensaje libre
+    if ([63007, 63015, 63016].includes(err.code)) throw err
   }
   // 2do intento: mensaje libre (funciona dentro de las 24h posteriores al "join")
   await twilioClient.messages.create({
