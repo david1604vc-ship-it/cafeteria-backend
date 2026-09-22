@@ -16,3 +16,6 @@ yarn-error.log
 # Sistema
 .DS_Store
 Thumbs.db
+
+# Respaldos de base de datos (contienen hashes de contraseñas)
+backups/

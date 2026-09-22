@@ -21,11 +21,14 @@ app.use(cors({
       .filter(Boolean)
     // Permitir cualquier subdominio de vercel.app (producción y previews)
     const esDominioVercel = /^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin || '')
+    // Dominio propio en E-nova (con y sin www)
+    const esDominioPropio = /^https:\/\/(www\.)?cafeteria-2\.com$/.test(origin || '')
     // Permitir localhost, devtunnels y orígenes configurados
     if (!origin || 
         origin.includes('localhost') || 
         origin.includes('devtunnels.ms') ||
         esDominioVercel ||
+        esDominioPropio ||
         extraOrigins.includes(origin)) {
       callback(null, true)
     } else {
